@@ -1,0 +1,571 @@
+online_bookings 
+
+<?php
+session_start();
+// Include the database connections
+require_once '../config/db_pdo.php';
+
+// --- PHPMailer Includes (Required for Email Reminders) ---
+// These explicit includes prevent the "Class not found" error
+require '../phpmailer-master/src/PHPMailer.php';
+require '../phpmailer-master/src/SMTP.php';
+require '../phpmailer-master/src/Exception.php';
+
+// Include Composer Autoload (for general dependencies)
+require '../vendor/autoload.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+// =======================================================
+// IMPORTANT CONFIGURATION: SMTP & Timezone
+// =======================================================
+define('CONF_TIMEZONE', 'Asia/Manila');
+define('CONF_SMTP_HOST', 'smtp.gmail.com');
+define('CONF_SMTP_PORT', 587);
+define('CONF_SMTP_USER', 'dentitrack2025@gmail.com');       // Your SMTP Email User
+define('CONF_SMTP_PASS', 'gpmennmjrynhujzq');             // Your SMTP Password (or App Password)
+// =======================================================
+
+// Set timezone for consistency 
+date_default_timezone_set(CONF_TIMEZONE);
+
+// Ensure PDO throws exceptions
+if (isset($pdo)) {
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $conn = $pdo; // Use $pdo as $conn for consistency with original code's variable names
+} else {
+    $error = "Database connection failed.";
+}
+
+// Check secretary role 
+/*
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'secretary') {
+    header('Location: ../public/login.php');
+    exit();
+}
+*/
+
+$error = '';
+$success = '';
+$appointments = [];
+
+// --- Filter and Search Logic ---
+$search_term = $_GET['search'] ?? '';
+$filter_status = $_GET['status'] ?? 'all'; // 'all', 'booked', 'approved', 'declined', 'completed'
+
+$where_clauses = [];
+$params = [];
+
+if ($filter_status !== 'all') {
+    $where_clauses[] = "a.status = ?";
+    $params[] = $filter_status;
+}
+
+if ($search_term) {
+    $search_pattern = '%' . $search_term . '%';
+    $where_clauses[] = "(CONCAT(pat.first_name, ' ', pat.last_name) LIKE ? OR s.service_name LIKE ?)";
+    $params[] = $search_pattern;
+    $params[] = $search_pattern;
+}
+
+$where_sql = count($where_clauses) > 0 ? 'WHERE ' . implode(' AND ', $where_clauses) : '';
+
+// ==========================
+// HANDLE APPROVE/DECLINE/REMIND ACTIONS
+// ==========================
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['approve_appointment'])) {
+        $appointment_id = $_POST['appointment_id'] ?? null;
+        if ($appointment_id) {
+            try {
+                // Update status to 'approved'
+                $stmt = $conn->prepare("UPDATE appointments SET status = 'approved', updated_at = NOW() WHERE appointment_id = ? AND status = 'booked'");
+                $stmt->execute([$appointment_id]);
+
+                if ($stmt->rowCount() > 0) {
+                    // Fetch details for email
+                    $stmt = $conn->prepare("
+                        SELECT 
+                            pat.email, 
+                            CONCAT(pat.first_name, ' ', pat.last_name) AS patient_name,
+                            s.service_name,
+                            a.appointment_date,
+                            a.appointment_time
+                        FROM appointments a
+                        JOIN patient pat ON a.patient_id = pat.patient_id
+                        JOIN services s ON a.service_id = s.service_id
+                        WHERE a.appointment_id = ?
+                    ");
+                    $stmt->execute([$appointment_id]);
+                    $data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                    if ($data && $data['email']) {
+                        $mail = new PHPMailer(true);
+                        $mail->isSMTP();
+                        $mail->Host = CONF_SMTP_HOST; 
+                        $mail->SMTPAuth = true;
+                        $mail->Username = CONF_SMTP_USER; 
+                        $mail->Password = CONF_SMTP_PASS; 
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                        $mail->Port = CONF_SMTP_PORT; 
+                        $mail->setFrom(CONF_SMTP_USER, 'DentiTrack - Secretary'); 
+                        $mail->addAddress($data['email'], $data['patient_name']);
+                        $mail->isHTML(true);
+                        $mail->Subject = 'Appointment Approved';
+
+                        $body = "
+                            <h2>Appointment Approved</h2>
+                            <p>Dear {$data['patient_name']},</p>
+                            <p>Your appointment for <strong>{$data['service_name']}</strong> on <strong>{$data['appointment_date']}</strong> at <strong>{$data['appointment_time']}</strong> has been approved.</p>
+                            <p>We look forward to seeing you.</p>
+                            <p>Thank you.</p>
+                            <p>DentiTrack Clinic Management</p>
+                        ";
+                        $mail->Body = $body;
+                        $mail->send();
+                        $success = 'Appointment approved and notification sent successfully.';
+                    } else {
+                        $success = 'Appointment approved, but no email found for the patient.';
+                    }
+                } else {
+                    $error = 'Appointment not found or already processed.';
+                }
+            } catch (Exception $e) {
+                $error = "Failed to approve appointment: " . $e->getMessage();
+            }
+        } else {
+            $error = 'Invalid appointment ID.';
+        }
+    } elseif (isset($_POST['decline_appointment'])) {
+        $appointment_id = $_POST['appointment_id'] ?? null;
+        if ($appointment_id) {
+            try {
+                // Update status to 'declined'
+                $stmt = $conn->prepare("UPDATE appointments SET status = 'declined', updated_at = NOW() WHERE appointment_id = ? AND status = 'booked'");
+                $stmt->execute([$appointment_id]);
+
+                if ($stmt->rowCount() > 0) {
+                    // Fetch details for email
+                    $stmt = $conn->prepare("
+                        SELECT 
+                            pat.email, 
+                            CONCAT(pat.first_name, ' ', pat.last_name) AS patient_name,
+                            s.service_name,
+                            a.appointment_date,
+                            a.appointment_time
+                        FROM appointments a
+                        JOIN patient pat ON a.patient_id = pat.patient_id
+                        JOIN services s ON a.service_id = s.service_id
+                        WHERE a.appointment_id = ?
+                    ");
+                    $stmt->execute([$appointment_id]);
+                    $data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                    if ($data && $data['email']) {
+                        $mail = new PHPMailer(true);
+                        $mail->isSMTP();
+                        $mail->Host = CONF_SMTP_HOST; 
+                        $mail->SMTPAuth = true;
+                        $mail->Username = CONF_SMTP_USER; 
+                        $mail->Password = CONF_SMTP_PASS; 
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                        $mail->Port = CONF_SMTP_PORT; 
+                        $mail->setFrom(CONF_SMTP_USER, 'DentiTrack - Secretary'); 
+                        $mail->addAddress($data['email'], $data['patient_name']);
+                        $mail->isHTML(true);
+                        $mail->Subject = 'Appointment Declined';
+
+                        $body = "
+                            <h2>Appointment Declined</h2>
+                            <p>Dear {$data['patient_name']},</p>
+                            <p>We regret to inform you that your appointment for <strong>{$data['service_name']}</strong> on <strong>{$data['appointment_date']}</strong> at <strong>{$data['appointment_time']}</strong> has been declined.</p>
+                            <p>Please contact the clinic for more details or to reschedule.</p>
+                            <p>Thank you.</p>
+                            <p>DentiTrack Clinic Management</p>
+                        ";
+                        $mail->Body = $body;
+                        $mail->send();
+                        $success = 'Appointment declined and notification sent successfully.';
+                    } else {
+                        $success = 'Appointment declined, but no email found for the patient.';
+                    }
+                } else {
+                    $error = 'Appointment not found or already processed.';
+                }
+            } catch (Exception $e) {
+                $error = "Failed to decline appointment: " . $e->getMessage();
+            }
+        } else {
+            $error = 'Invalid appointment ID.';
+        }
+    } elseif (isset($_POST['remind_payment'])) {
+        $patient_id = $_POST['patient_id'] ?? null;
+        $patient_email = $_POST['patient_email'] ?? null;
+        $patient_name = $_POST['patient_name'] ?? null;
+        $outstanding_balance = $_POST['outstanding_balance'] ?? 0;
+
+        if ($patient_id && $patient_email && $outstanding_balance > 0) {
+            try {
+                $mail = new PHPMailer(true);
+                $mail->isSMTP();
+                $mail->Host = CONF_SMTP_HOST;
+                $mail->SMTPAuth = true;
+                $mail->Username = CONF_SMTP_USER;
+                $mail->Password = CONF_SMTP_PASS;
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                $mail->Port = CONF_SMTP_PORT;
+                $mail->setFrom(CONF_SMTP_USER, 'DentiTrack - Secretary');
+                $mail->addAddress($patient_email, $patient_name);
+                $mail->isHTML(true);
+                $mail->Subject = 'Outstanding Payment Reminder';
+
+                $body = "
+                    <h2>Payment Reminder</h2>
+                    <p>Dear {$patient_name},</p>
+                    <p>This is a gentle reminder that you have an outstanding balance of <strong>₱" . number_format($outstanding_balance, 2) . "</strong>.</p>
+                    <p>Please contact the clinic to settle your payment or discuss installment options.</p>
+                    <p>Thank you for your attention to this matter.</p>
+                    <p>Best regards,</p>
+                    <p>DentiTrack Clinic Management</p>
+                ";
+                $mail->Body = $body;
+                $mail->send();
+                $success = 'Payment reminder sent successfully to the patient.';
+            } catch (Exception $e) {
+                $error = "Failed to send payment reminder: " . $e->getMessage();
+            }
+        } else {
+            $error = 'Invalid patient details or no outstanding balance.';
+        }
+    }
+}
+
+// ==========================
+// FETCH APPOINTMENTS WITH FILTERS
+// ==========================
+if (isset($conn)) {
+    try {
+        $sql = "
+            SELECT 
+                a.appointment_id,
+                CONCAT(pat.first_name, ' ', pat.last_name) AS patient_name,
+                pat.patient_id,
+                pat.email AS patient_email,
+                pat.outstanding_balance,
+                s.service_id,
+                s.service_name,
+                s.price AS service_price,
+                a.appointment_date,
+                a.appointment_time,
+                a.status,
+                p.proof_image,
+                p.downpayment AS initial_fee
+            FROM 
+                appointments a
+            JOIN 
+                patient pat ON a.patient_id = pat.patient_id
+            JOIN 
+                services s ON a.service_id = s.service_id
+            LEFT JOIN
+                payments p ON a.appointment_id = p.appointment_id
+            {$where_sql} 
+            ORDER BY a.appointment_date DESC, a.start_time DESC
+        ";
+
+        $stmt = $conn->prepare($sql);
+        $stmt->execute($params);
+        $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    } catch (Exception $e) {
+        $error = "Failed to fetch appointments: " . $e->getMessage();
+        $appointments = [];
+    }
+}
+
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Booking Management - DentiTrack</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<style>
+/* --- Basic Layout and Styling (Keep consistent with other pages) --- */
+*,*::before,*::after{box-sizing:border-box;}
+body,html{margin:0;padding:0;height:100%;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#e6f0ff;color:#003366;}
+body{display:flex;min-height:100vh;overflow-x:hidden;}
+.sidebar{width:260px;background:linear-gradient(to bottom,#3399ff,#0066cc);padding:20px;color:white;display:flex;flex-direction:column;box-shadow:2px 0 10px rgba(0,0,0,0.15);}
+.sidebar h2{text-align:center;margin-bottom:30px;font-size:24px;font-weight:700;}
+.sidebar a{display:block;padding:12px 20px;margin:10px 0;color:#cce0ff;text-decoration:none;border-left:4px solid transparent;font-weight:600;transition:0.3s;}
+.sidebar a:hover,.sidebar a.active{background:rgba(255,255,255,0.15);color:white;border-left:4px solid #ffcc00;}
+main.main-content{flex:1;background:#fff;padding:40px 50px;overflow-y:auto;}
+header h1{font-size:2.3rem;font-weight:900;color:#004080;display:flex;align-items:center;gap:15px;}
+.flash-message{max-width:100%;padding:15px 20px;margin-bottom:20px;border-radius:8px;font-weight:600;display:flex;align-items:center;gap:10px;}
+.flash-success{background:#d4edda;color:#155724;}
+.flash-error{background:#f8d7da;color:#721c24;}
+.table-container{overflow-x:auto;}
+.data-table{width:100%;border-collapse:collapse;margin-top:20px;}
+.data-table th,.data-table td{padding:12px 15px;text-align:left;border-bottom:1px solid #e0e6f0;}
+.data-table th{background-color:#0066cc;color:white;font-weight:700;text-transform:uppercase;font-size:14px;}
+.data-table tr:hover{background-color:#f5f8ff;}
+.status-tag{padding:4px 8px;border-radius:15px;font-weight:600;font-size:12px;}
+.status-booked{background:#ffcc80;color:#e65100;}
+.status-approved{background:#a5d6a7;color:#2e7d32;}
+.status-declined{background:#ff8a80;color:#d32f2f;}
+.status-completed{background:#64b5f6;color:#1565c0;}
+.status-cancelled{background:#bdbdbd;color:#424242;}
+.status-rest{background:#ffe082;color:#ef6c00;}
+.action-btn{padding:8px 12px;border:none;border-radius:15px;cursor:pointer;font-size:14px;font-weight:600;transition:background-color 0.2s; display:inline-block; margin-left:5px;}
+.btn-view{background-color:#4dd0e1;color:white;}
+.btn-view:hover{background-color:#00bcd4;}
+.btn-approve{background-color:#4caf50;color:white;}
+.btn-approve:hover{background-color:#388e3c;}
+.btn-decline{background-color:#f44336;color:white;}
+.btn-decline:hover{background-color:#d32f2f;}
+.btn-primary{background-color:#2196f3;color:white;}
+.btn-primary:hover{background-color:#1976d2;}
+.btn-remind{background-color:#ff9800;color:white;}
+.btn-remind:hover{background-color:#f57c00;}
+
+/* Filter and Search Container */
+.controls-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    background: #f0f7ff;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+.search-form {
+    display: flex;
+    gap: 10px;
+}
+.search-form input[type="text"], .search-form select {
+    padding: 10px 15px;
+    border: 1px solid #3399ff;
+    border-radius: 8px;
+    font-size: 14px;
+}
+.search-form button {
+    padding: 10px 15px;
+    background-color: #0066cc;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+.search-form button:hover {
+    background-color: #0050a0;
+}
+
+/* Modal Styling */
+.modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;overflow:auto;background-color:rgba(0,0,0,0.6);}
+.modal-content{background-color:#fefefe;margin:5% auto;padding:30px;border:1px solid #888;width:90%;max-width:600px;border-radius:15px;box-shadow:0 10px 30px rgba(0,0,0,0.2);}
+.close-btn{color:#aaa;float:right;font-size:28px;font-weight:bold;}
+.close-btn:hover,.close-btn:focus{color:#000;text-decoration:none;cursor:pointer;}
+.modal-content h2 { border-bottom: 2px solid #0066cc; padding-bottom: 10px; margin-bottom: 20px; color: #0066cc; }
+.detail-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee; }
+.detail-item strong { color: #004080; }
+.proof-section { margin-top: 20px; border-top: 2px solid #f0f0f0; padding-top: 20px; }
+.proof-section img { max-width: 100%; height: auto; display: block; margin-top: 10px; border: 1px solid #ccc; border-radius: 5px; }
+</style>
+</head>
+<body>
+<nav class="sidebar">
+    <h2><i class="fas fa-tooth"></i> DentiTrack</h2>
+    <a href="secretary_dashboard.php"><i class="fas fa-home"></i> Dashboard</a>
+    <a href="find_patient.php" ><i class="fas fa-search"></i> Find Patient</a>
+    <a href="view_patients.php"><i class="fas fa-users"></i> View Patients</a>
+    <a href="Payments.php"><i class="fas fa-cash-register"></i> Payments</a>
+    <a href="online_bookings.php" class="active"><i class="fas fa-calendar-check"></i> Booking Management</a>
+    <a href="payment_logs.php" ><i class="fas fa-file-invoice-dollar"></i> Payments Log</a>
+    <a href="services_list.php"><i class="fas fa-list"></i> Services</a>
+    <a href="appointments.php"><i class="fas fa-calendar-check"></i> Manage Consultation</a>
+    <a href="create_announcements.php"><i class="fas fa-bullhorn"></i> Announcements</a>
+    <a href="inventory.php"><i class="fas fa-boxes"></i> Inventory</a>
+    <a href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
+</nav>
+
+<main class="main-content">
+    <header><h1><i class="fas fa-calendar-check"></i> Booking Management</h1></header>
+    <hr>
+    <?php if ($error): ?>
+    <div class="flash-message flash-error"><i class="fas fa-times-circle"></i> <?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
+    <?php if ($success): ?>
+    <div class="flash-message flash-success"><i class="fas fa-check-circle"></i> <?= htmlspecialchars($success) ?></div>
+    <?php endif; ?>
+
+    <div class="controls-container">
+        <form method="GET" class="search-form">
+            <input type="text" name="search" placeholder="Search Patient/Service" value="<?= htmlspecialchars($search_term) ?>">
+            <select name="status">
+                <option value="all" <?= $filter_status === 'all' ? 'selected' : '' ?>>All Statuses</option>
+                <option value="booked" <?= $filter_status === 'booked' ? 'selected' : '' ?>>Booked</option>
+                <option value="approved" <?= $filter_status === 'approved' ? 'selected' : '' ?>>Approved</option>
+                <option value="declined" <?= $filter_status === 'declined' ? 'selected' : '' ?>>Declined</option>
+                <option value="completed" <?= $filter_status === 'completed' ? 'selected' : '' ?>>Completed</option>
+            </select>
+            <button type="submit"><i class="fas fa-filter"></i> Filter</button>
+            <?php if ($search_term || $filter_status !== 'all'): ?>
+                <a href="online_bookings.php" class="action-btn btn-view" style="width: auto; height: 38px; line-height: 20px; border-radius: 8px;"><i class="fas fa-times"></i> Clear</a>
+            <?php endif; ?>
+        </form>
+    </div>
+
+    <div class="table-container">
+        <?php if (!empty($appointments)): ?>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Patient Name</th>
+                    <th>Service</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($appointments as $appointment): 
+                    $status_class = 'status-' . strtolower($appointment['status']);
+                    $is_pending = strtolower($appointment['status']) === 'booked';
+                    $is_approved = strtolower($appointment['status']) === 'approved';
+                    $is_completed = strtolower($appointment['status']) === 'completed';
+                    $has_outstanding = $appointment['outstanding_balance'] > 0;
+                ?>
+                <tr>
+                    <td><?= htmlspecialchars($appointment['appointment_id']) ?></td>
+                    <td><?= htmlspecialchars($appointment['patient_name']) ?></td>
+                    <td><?= htmlspecialchars($appointment['service_name']) ?></td>
+                    <td><?= date('M d, Y', strtotime($appointment['appointment_date'])) ?></td>
+                    <td><?= htmlspecialchars($appointment['appointment_time']) ?></td>
+                    <td><span class="status-tag <?= $status_class ?>"><?= ucfirst($appointment['status']) ?></span></td>
+                    <td>
+                        <button class="action-btn btn-view" onclick="showAppointmentDetailsModal(
+                            '<?= htmlspecialchars($appointment['patient_name']) ?>', 
+                            '<?= htmlspecialchars($appointment['service_name']) ?>', 
+                            '<?= date('M d, Y', strtotime($appointment['appointment_date'])) ?>', 
+                            '<?= htmlspecialchars($appointment['appointment_time']) ?>', 
+                            '<?= ucfirst($appointment['status']) ?>', 
+                            '<?= htmlspecialchars($appointment['proof_image'] ?? '') ?>',
+                            '<?= number_format($appointment['initial_fee'] ?? 0, 2) ?>',
+                            '<?= number_format($appointment['outstanding_balance'], 2) ?>'
+                        )">
+                            <i class="fas fa-eye"></i> View
+                        </button>
+                        <?php if ($is_pending): ?>
+                            <form method="POST" style="display:inline-block; margin-left: 5px;">
+                                <input type="hidden" name="appointment_id" value="<?= $appointment['appointment_id'] ?>">
+                                <button type="submit" name="approve_appointment" class="action-btn btn-approve">
+                                    <i class="fas fa-check"></i> Approve
+                                </button>
+                            </form>
+                            <form method="POST" style="display:inline-block; margin-left: 5px;">
+                                <input type="hidden" name="appointment_id" value="<?= $appointment['appointment_id'] ?>">
+                                <button type="submit" name="decline_appointment" class="action-btn btn-decline">
+                                    <i class="fas fa-times"></i> Decline
+                                </button>
+                            </form>
+                        <?php endif; ?>
+                        <?php if ($is_approved): ?>
+                            <a href="Payments.php?online_booking_process=1&appointment_id=<?= htmlspecialchars($appointment['appointment_id']) ?>&patient_id=<?= htmlspecialchars($appointment['patient_id']) ?>&service_id=<?= htmlspecialchars($appointment['service_id']) ?>&downpayment=<?= number_format($appointment['initial_fee'] ?? 0, 2, '.', '') ?>&service_price=<?= number_format($appointment['service_price'], 2, '.', '') ?>" class="action-btn btn-primary" style="display:inline-block; margin-left:5px;">
+                                <i class="fas fa-hand-holding-dollar"></i> Process Payment
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($is_completed && $has_outstanding): ?>
+                            <form method="POST" style="display:inline-block; margin-left: 5px;">
+                                <input type="hidden" name="patient_id" value="<?= $appointment['patient_id'] ?>">
+                                <input type="hidden" name="patient_email" value="<?= htmlspecialchars($appointment['patient_email']) ?>">
+                                <input type="hidden" name="patient_name" value="<?= htmlspecialchars($appointment['patient_name']) ?>">
+                                <input type="hidden" name="outstanding_balance" value="<?= $appointment['outstanding_balance'] ?>">
+                                <button type="submit" name="remind_payment" class="action-btn btn-remind">
+                                    <i class="fas fa-bell"></i> Remind Payment
+                                </button>
+                            </form>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php else: ?>
+            <p style="text-align: center; margin-top: 30px; font-size: 1.1rem;">No appointments found matching your criteria.</p>
+        <?php endif; ?>
+    </div>
+
+    <div id="appointmentDetailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="document.getElementById('appointmentDetailsModal').style.display='none'">&times;</span>
+            <h2>Appointment Details</h2>
+
+            <div class="detail-item"><strong>Patient Name:</strong> <span id="modal-patient-name"></span></div>
+            <div class="detail-item"><strong>Service:</strong> <span id="modal-service-name"></span></div>
+            <div class="detail-item"><strong>Date:</strong> <span id="modal-date"></span></div>
+            <div class="detail-item"><strong>Time:</strong> <span id="modal-time"></span></div>
+            <div class="detail-item"><strong>Status:</strong> <span id="modal-status"></span></div>
+            <div class="detail-item"><strong>Downpayment:</strong> ₱<span id="modal-initial-fee"></span></div>
+            <div class="detail-item"><strong>Outstanding Balance:</strong> ₱<span id="modal-outstanding-balance"></span></div>
+            
+            <div class="proof-section">
+                <h3>Proof of Downpayment</h3>
+                <a href="#" id="proof-image-link" target="_blank" style="display: none; font-weight: 600; color: #0066cc;">View Full Image</a>
+                <span id="proof-status"></span>
+                <img id="proof-image" src="" alt="Proof of Payment" style="display: none;">
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<script>
+// Function to show the appointment details modal
+function showAppointmentDetailsModal(patientName, serviceName, date, time, status, imageUrl, initialFee, outstandingBalance) {
+    const modal = document.getElementById('appointmentDetailsModal');
+    document.getElementById('modal-patient-name').textContent = patientName;
+    document.getElementById('modal-service-name').textContent = serviceName;
+    document.getElementById('modal-date').textContent = date;
+    document.getElementById('modal-time').textContent = time;
+    document.getElementById('modal-status').textContent = status;
+    document.getElementById('modal-initial-fee').textContent = initialFee;
+    document.getElementById('modal-outstanding-balance').textContent = outstandingBalance;
+
+    // Handle Proof of Payment Image
+    const proofImage = document.getElementById('proof-image');
+    const proofImageLink = document.getElementById('proof-image-link');
+    const proofStatus = document.getElementById('proof-status');
+
+    if (imageUrl && imageUrl.trim() !== '') {
+        const fullUrl = '../' + imageUrl; // Adjust path if necessary
+        proofImage.src = fullUrl;
+        proofImageLink.href = fullUrl;
+        proofImageLink.style.display = 'block';
+        proofImage.style.display = 'block';
+        proofStatus.textContent = '';
+    } else {
+        proofImage.src = ''; // Clear source
+        proofImage.style.display = 'none';
+        proofImageLink.style.display = 'none';
+        proofStatus.textContent = 'No proof of downpayment provided.';
+    }
+
+    // Display the modal
+    modal.style.display = 'block';
+}
+
+// Close the modal if the user clicks anywhere outside of it
+window.onclick = function(event) {
+    const modal = document.getElementById('appointmentDetailsModal');
+    if (event.target == modal) {
+        modal.style.display = 'none';
+    }
+}
+</script>
+</body>
+</html>

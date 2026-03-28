@@ -1,0 +1,197 @@
+/* Doctor's Body */
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(145deg, #cce4f7, #e0f7ff);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    overflow: hidden;
+    animation: fadeIn 1s ease-in-out;
+}
+
+/* Auth Container */
+.auth-container {
+    background: white;
+    border-radius: 30px;
+    padding: 60px 40px;
+    width: 450px;
+    max-width: 90%;
+    box-shadow: 0 10px 40px rgba(0, 123, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+    animation: popUp 0.8s ease-out;
+    transition: 0.3s;
+}
+
+/* Auth Container Decorative Background */
+.auth-container::before {
+    content: "";
+    position: absolute;
+    top: -80px;
+    right: -80px;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, #99c2ff 0%, transparent 70%);
+    z-index: 0;
+}
+
+/* Heading */
+.auth-container h2 {
+    text-align: center;
+    color: #007bff; /* Blue Color */
+    font-size: 30px;
+    margin-bottom: 30px;
+    z-index: 1;
+    position: relative;
+    font-weight: 600;
+}
+
+/* Form Card */
+.form-card {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    z-index: 1;
+    position: relative;
+}
+
+/* Inputs and Select */
+input,
+select {
+    padding: 14px 20px;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    font-size: 16px;
+    background-color: #f0f8ff;
+    text-align: left;
+    transition: 0.3s ease;
+    box-shadow: inset 0 1px 3px rgba(0, 123, 255, 0.1);
+    width: 100%;
+}
+
+/* Placeholder and Select Styling */
+input::placeholder,
+select {
+    color: #999;
+}
+
+/* Input and Select Focus */
+input:focus,
+select:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 12px #66b3ff;
+    background-color: #fff;
+}
+
+/* Button Container */
+.button-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Button Styling */
+button {
+    padding: 16px;
+    background: linear-gradient(145deg, #007bff, #0056b3);
+    color: white;
+    font-weight: bold;
+    font-size: 17px;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
+    text-align: center;
+    margin-left: 12px;
+    letter-spacing: 0.6px;
+    width: 100%;
+    max-width: 440px;
+}
+
+/* Button Hover */
+button:hover {
+    background: linear-gradient(145deg, #0056b3, #007bff);
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 12px 28px rgba(0, 123, 255, 0.45);
+}
+
+/* Paragraph Styling */
+p {
+    text-align: center;
+    font-size: 15px;
+    color: #555;
+    z-index: 1;
+    position: relative;
+}
+
+/* Link Styling */
+p a {
+    color: #007bff; /* Blue Color */
+    font-weight: bold;
+    text-decoration: none;
+    transition: 0.2s;
+}
+
+/* Link Hover */
+p a:hover {
+    text-decoration: underline;
+}
+
+/* Hidden Class */
+.hidden {
+    display: none;
+}
+
+/* Fade-in Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Pop-Up Animation */
+@keyframes popUp {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* Back Button */
+.back-button {
+    background: none;
+    color: #007bff; /* Blue Color */
+    border: 2px solid #007bff;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s ease;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 2;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+}
+
+/* Back Button Hover */
+.back-button:hover {
+    background: #007bff;
+    color: white;
+    box-shadow: 0 8px 22px rgba(0, 123, 255, 0.3);
+}
