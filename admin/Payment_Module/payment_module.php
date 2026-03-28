@@ -1,10 +1,4 @@
 <?php
-// payment_module.php
-// Payments / Receipts admin module adjusted to show only clinic income (no expenses).
-// FIX: Confirmed the join structure (payments -> patient -> users) and (payments -> services).
-// FIX: Ensured the SELECT statements correctly alias joined columns to 'patient_username' and 'servicename_joined'.
-// NOTE: If you see 'N/A (user empty)' or 'N/A (service missing)', the data in your linked tables is empty, not the join failing.
-
 define('DEBUG', true);
 if (DEBUG) { ini_set('display_errors','1'); error_reporting(E_ALL); }
 
@@ -15,7 +9,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
 }
 
 // NOTE: Ensure your database connection file path is correct.
-include '../config/db.php'; // expects $conn (mysqli)
+include '../../config/db.php'; // expects $conn (mysqli)
 
 function safe($v){ return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
 function refValues($arr){ foreach ($arr as $k => $v) $refs[$k] = &$arr[$k]; return $refs ?? []; }
@@ -731,15 +725,15 @@ main.main-content {
         <button id="menu-toggle-close" style="display: none;"><i class="fas fa-times"></i></button>
     </div>
     <div class="sidebar-nav">
-        <a href="admin_dashboard.php"><i class="fas fa-home"></i> Dashboard</a>
-        <a href="manage_accounts.php"><i class="fas fa-users-cog"></i> Manage Accounts</a>
-        <a href="clinic_services_admin.php"><i class="fas fa-tools"></i> Clinic Services</a>
-        <a href="generate_reports.php"><i class="fas fa-chart-line"></i> Generate Reports</a>
-        <a href="payment_module.php" class="active"><i class="fas fa-money-check-dollar"></i> Payment Module</a>
-        <a href="clinic_schedule_admin.php"><i class="fas fa-calendar-check"></i> Clinic Schedule</a>
-        <a href="admin_settings.php"><i class="fas fa-gear"></i> System Settings</a>
+        <a href="../Dashboard/admin_dashboard.php" ><i class="fas fa-home"></i> Dashboard</a>
+        <a href="../Manage_accounts/Manage_accounts.php"><i class="fas fa-users-cog"></i> Manage Accounts</a>
+        <a href="../Clinic_Services/clinic_services_admin.php"><i class="fas fa-tools"></i> Clinic Services</a>
+        <a href="../Generate_Reports/generate_reports.php"><i class="fas fa-chart-line"></i> Generate Reports</a>
+        <a href="../Payment_Module/payment_module.php" class="active"><i class="fas fa-money-check-dollar"></i> Payment Module</a>
+        <a href="../Clinic_Scedule/clinic_schedule_admin.php"><i class="fas fa-calendar-check"></i> Clinic Schedule</a>
+        <a href="../System_Settings/admin_settings.php"><i class="fas fa-gear"></i> System Settings</a>
     </div>
-    <a href="logout.php" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a> 
+    <a href="../logout.php" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a> 
 </nav>
 
 

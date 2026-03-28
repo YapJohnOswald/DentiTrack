@@ -8,8 +8,8 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     exit();
 }
 
-include '../config/db.php'; // mysqli $conn
-include '../config/settings_loader.php';
+include '../../config/db.php'; // mysqli $conn
+include '../../config/settings_loader.php';
 
 $message = '';
 $search_term = $_GET['service_search'] ?? ''; // Get the search term
@@ -604,15 +604,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <button id="menu-toggle-close" style="display: none; background:none; border:none; font-size:24px; color:var(--text-dark); cursor:pointer;"><i class="fas fa-times"></i></button>
     </div>
     <div class="sidebar-nav">
-        <a href="admin_dashboard.php" ><i class="fas fa-home"></i> Dashboard</a>
-        <a href="manage_accounts.php"><i class="fas fa-users-cog"></i> Manage Accounts</a>
-        <a href="clinic_services_admin.php" class="active"><i class="fas fa-tools"></i> Clinic Services</a>
-        <a href="generate_reports.php"><i class="fas fa-chart-line"></i> Generate Reports</a>
-        <a href="payment_module.php"><i class="fas fa-money-check-dollar"></i> Payment Module</a>
-        <a href="clinic_schedule_admin.php"><i class="fas fa-calendar-check"></i> Clinic Schedule</a>
-        <a href="admin_settings.php"><i class="fas fa-gear"></i> System Settings</a>
+        <a href="../Dashboard/admin_dashboard.php" ><i class="fas fa-home"></i> Dashboard</a>
+        <a href="../Manage_accounts/Manage_accounts.php"><i class="fas fa-users-cog"></i> Manage Accounts</a>
+        <a href="../Clinic_Services/clinic_services_admin.php" class="active"><i class="fas fa-tools"></i> Clinic Services</a>
+        <a href="../Generate_Reports/generate_reports.php"><i class="fas fa-chart-line"></i> Generate Reports</a>
+        <a href="../Payment_Module/payment_module.php"><i class="fas fa-money-check-dollar"></i> Payment Module</a>
+        <a href="../Clinic_Scedule/clinic_schedule_admin.php"><i class="fas fa-calendar-check"></i> Clinic Schedule</a>
+        <a href="../System_Settings/admin_settings.php"><i class="fas fa-gear"></i> System Settings</a>
     </div>
-    <a href="logout.php" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    <a href="../logout.php" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
 </nav>
 
 <main class="main-content">
