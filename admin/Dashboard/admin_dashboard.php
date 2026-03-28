@@ -5,7 +5,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     exit();
 }
 
-include '../config/db.php'; // expects $conn (mysqli)
+include '../../config/db.php'; // expects $conn (mysqli)
 
 // helper
 function safe($v) { return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
@@ -395,14 +395,14 @@ main.main-content strong {
     </div>
     <div class="sidebar-nav">
         <a href="admin_dashboard.php" class="active"><i class="fas fa-home"></i> Dashboard</a>
-        <a href="manage_accounts.php"><i class="fas fa-users-cog"></i> Manage Accounts</a>
-        <a href="clinic_services_admin.php"><i class="fas fa-tools"></i> Clinic Services</a>
-        <a href="generate_reports.php"><i class="fas fa-chart-line"></i> Generate Reports</a>
-        <a href="payment_module.php"><i class="fas fa-money-check-dollar"></i> Payment Module</a>
-        <a href="clinic_schedule_admin.php"><i class="fas fa-calendar-check"></i> Clinic Schedule</a>
-        <a href="admin_settings.php"><i class="fas fa-gear"></i> System Settings</a>
+        <a href="../manage_accounts.php"><i class="fas fa-users-cog"></i> Manage Accounts</a>
+        <a href="../clinic_services_admin.php"><i class="fas fa-tools"></i> Clinic Services</a>
+        <a href="../generate_reports.php"><i class="fas fa-chart-line"></i> Generate Reports</a>
+        <a href="../payment_module.php"><i class="fas fa-money-check-dollar"></i> Payment Module</a>
+        <a href="../clinic_schedule_admin.php"><i class="fas fa-calendar-check"></i> Clinic Schedule</a>
+        <a href="../admin_settings.php"><i class="fas fa-gear"></i> System Settings</a>
     </div>
-    <a href="logout.php" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    <a href="../logout.php" class="logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
 </nav>
 
 
@@ -415,21 +415,21 @@ main.main-content strong {
 
     <div class="widgets">
         
-        <div class="widget" onclick="location.href='manage_accounts.php'">
+        <div class="widget" onclick="location.href='../manage_accounts.php'">
             <i class="fas fa-users"></i>
             <div class="title">Total Users (Staff/Patients)</div>
             <div class="value"><?= $total_users_count ?></div>
             <div class="subtitle">Excludes current admin count</div>
         </div>
 
-        <div class="widget" onclick="location.href='appointments.php'">
+        <div class="widget" onclick="location.href='../appointments.php'">
             <i class="fas fa-calendar-check"></i>
             <div class="title">Upcoming Appointments</div>
             <div class="value"><?= $upcoming_appointments ?></div>
             <div class="subtitle">Appointments scheduled from today</div>
         </div>
 
-        <div class="widget" onclick="location.href='payment_module.php'">
+        <div class="widget" onclick="location.href='../payment_module.php'">
             <i class="fas fa-sack-dollar"></i>
             <div class="title">Total Revenue</div>
             <div class="value"><?= '₱' . number_format($total_revenue, 2) ?></div>
@@ -438,7 +438,7 @@ main.main-content strong {
         
     </div>
 
-    <?php include '../analytics_graph/analytics_admin.php'; ?>
+    <?php include 'analytics/analytics_admin.php'; ?>
     
 </main>
 

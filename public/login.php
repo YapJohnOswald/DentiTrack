@@ -86,7 +86,7 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_token'])) {
 
             // Redirect by role
             switch ($user['role']) {
-                case 'admin': header('Location: ../admin/admin_dashboard.php'); exit;
+                case 'admin': header('Location: ../admin/Dashboard/admin_dashboard.php'); exit;
                 case 'secretary': header('Location: ../secretary/secretary_dashboard.php'); exit;
                 case 'doctor': header('Location: ../doctor/doctor_dashboard.php'); exit;
                 case 'patient': header('Location: ../patient/patient_dashboard.php'); exit;
@@ -145,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
 
         switch ($user['role']) {
             case 'patient': header('Location: ../patient/patient_dashboard.php'); break;
-            case 'admin': header('Location: ../admin/admin_dashboard.php'); break;
+            case 'admin': header('Location: ../admin/Dashboard/admin_dashboard.php'); break;
             case 'secretary': header('Location: ../secretary/secretary_dashboard.php'); break;
             case 'doctor': header('Location: ../doctor/doctor_dashboard.php'); break;
             default:
